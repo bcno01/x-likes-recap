@@ -780,7 +780,11 @@
       const entry = matches && matches[0];
       if (!entry) return { error: `${name}: zipの中に like.js が見つかりませんでした` };
       return entry.async('string').then((text) => parseFileText(text, name));
-    }).catch(() => ({ error: `${name}: zipファイルの読み込みに失敗しました(壊れていないか確認してください)` }));
+    }).catch((e) => {
+      const sizeMB = (file.size / (1024 * 1024)).toFixed(0);
+      const detail = e && e.message ? e.message : '不明なエラー';
+      return { error: `${name}(${sizeMB}MB): zipファイルの読み込みに失敗しました(${detail})` };
+    });
   }
 
   function parseFileText(text, name) {
