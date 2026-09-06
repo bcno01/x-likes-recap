@@ -1,0 +1,1420 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>いいねリキャップ</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<meta name="theme-color" content="#ffffff" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root {
+    --bg: #ffffff;
+    --panel: #ffffff;
+    --panel-2: #f6f7f8;
+    --border: #e7e9ec;
+    --text: #14171a;
+    --text-dim: #6b7280;
+    --accent: #14171a;
+    --accent-2: #f91880;
+    --danger: #d9342b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding-bottom: 40px;
+    -webkit-font-smoothing: antialiased;
+  }
+  header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(8px);
+    z-index: 10;
+  }
+  header h1 {
+    font-size: 16px;
+    margin: 0;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+  main {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 20px 16px;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .drop-zone {
+    border: 1.5px dashed #cbd2d9;
+    border-radius: 14px;
+    padding: 36px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .drop-zone:hover {
+    background: var(--panel-2);
+  }
+  .drop-zone.drag-over {
+    border-color: var(--accent);
+    background: var(--panel-2);
+  }
+  .drop-zone p {
+    margin: 0 0 8px;
+    color: var(--text-dim);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .drop-zone strong {
+    color: var(--text);
+    font-size: 15px;
+  }
+  input[type="file"] {
+    display: none;
+  }
+  .btn {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 999px;
+    padding: 10px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn.secondary {
+    background: #fff;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn:active {
+    opacity: 0.7;
+  }
+  details.help {
+    margin-top: 16px;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+  details.help summary {
+    cursor: pointer;
+    color: var(--text);
+    font-weight: 600;
+  }
+  details.help ol {
+    margin: 8px 0 0;
+    padding-left: 20px;
+    line-height: 1.8;
+  }
+  .status-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .status-line .count {
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+  .status-line .count strong {
+    color: var(--text);
+    font-size: 17px;
+    font-weight: 700;
+  }
+  .preset-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .preset-chip {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    border-radius: 999px;
+    padding: 7px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    font-family: inherit;
+  }
+  .preset-chip.active {
+    background: var(--text);
+    color: #fff;
+    border-color: var(--text);
+  }
+  .filter-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 14px;
+  }
+  .filter-row label {
+    font-size: 12px;
+    color: var(--text-dim);
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  select {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 14px;
+  }
+  .note {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 14px;
+    line-height: 1.6;
+  }
+  .post-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .post-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    box-shadow: 0 1px 2px rgba(20, 23, 26, 0.03);
+    cursor: pointer;
+    transition: border-color 0.12s, background 0.12s;
+  }
+  .post-card.selectable:hover {
+    border-color: #cbd2d9;
+  }
+  .post-card.selected {
+    background: #fdf2f7;
+    border-color: var(--accent-2);
+  }
+  .post-card.copied-flash {
+    border-color: var(--accent-2);
+    box-shadow: 0 0 0 2px rgba(249, 24, 128, 0.22);
+  }
+  .post-card .card-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .post-card input[type="checkbox"] {
+    margin-top: 1px;
+    width: 24px;
+    height: 24px;
+    accent-color: var(--accent-2);
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .post-card .date {
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .x-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .x-badge {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #000;
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .post-card .body {
+    font-size: 14.5px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+  .liked-indicator {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--accent-2);
+    font-weight: 600;
+  }
+  .post-card a.open-link {
+    font-size: 13px;
+    color: var(--text-dim);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .post-card a.open-link:hover {
+    color: var(--text);
+    text-decoration: underline;
+  }
+  .empty-state {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 14px;
+    padding: 40px 16px;
+  }
+  .error-box {
+    background: #fdf1f0;
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 13px;
+    line-height: 1.6;
+    margin-bottom: 14px;
+  }
+  .floating-bar {
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--text);
+    color: #fff;
+    border-radius: 999px;
+    padding: 10px 12px 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    box-shadow: 0 8px 24px rgba(20, 23, 26, 0.25);
+    z-index: 20;
+    max-width: calc(100% - 32px);
+  }
+  .floating-bar span {
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .selection-bar-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .floating-bar .btn {
+    padding: 8px 14px;
+    font-size: 12.5px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .floating-bar .btn.secondary {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.25);
+  }
+  .floating-bar.back-bar {
+    padding: 8px;
+  }
+  .summary-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 14px 0;
+  }
+  .copy-toast {
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .tweet-embed-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    align-items: center;
+  }
+  .tweet-embed-list .tweet-embed {
+    width: 100%;
+    max-width: 480px;
+  }
+  .embed-loading {
+    font-size: 13px;
+    color: var(--text-dim);
+    text-align: center;
+    padding: 16px 0;
+  }
+  .embed-error {
+    font-size: 13px;
+    color: var(--danger);
+    text-align: center;
+    padding: 12px 14px;
+    background: #fdf1f0;
+    border: 1px solid var(--danger);
+    border-radius: 10px;
+  }
+  .calendar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 23, 26, 0.45);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 50;
+    padding: 0;
+  }
+  .calendar-panel {
+    background: #fff;
+    border-radius: 20px 20px 0 0;
+    padding: 20px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.2);
+  }
+  @media (min-width: 480px) {
+    .calendar-overlay { align-items: center; padding: 16px; }
+    .calendar-panel { border-radius: 20px; }
+  }
+  .calendar-range-label {
+    text-align: center;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 14px;
+    min-height: 18px;
+  }
+  .calendar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .calendar-header span {
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .calendar-nav {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    font-size: 17px;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--text);
+  }
+  .calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+  }
+  .calendar-day {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: none;
+    font-size: 13.5px;
+    color: var(--text);
+    cursor: pointer;
+    border-radius: 999px;
+    font-family: inherit;
+  }
+  .calendar-day.other-month {
+    color: #cbd2d9;
+  }
+  .calendar-day.in-range {
+    background: #fdf2f7;
+    border-radius: 0;
+  }
+  .calendar-day.range-start,
+  .calendar-day.range-end {
+    background: var(--accent-2);
+    color: #fff;
+  }
+  .calendar-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 18px;
+  }
+  .calendar-actions .btn {
+    flex: 1;
+  }
+  .global-toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--text);
+    color: #fff;
+    border-radius: 999px;
+    padding: 10px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    box-shadow: 0 8px 24px rgba(20, 23, 26, 0.25);
+    z-index: 30;
+    pointer-events: none;
+  }
+  .summary-placeholder {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 13.5px;
+    line-height: 1.7;
+    padding: 40px 16px;
+  }
+  [hidden] { display: none !important; }
+
+  @media (min-width: 1024px) {
+    main.has-data {
+      max-width: 1120px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-rows: auto auto 1fr;
+      column-gap: 24px;
+      align-items: start;
+    }
+    main.has-data #load-panel { grid-column: 1; grid-row: 1; }
+    main.has-data #result-panel { grid-column: 1; grid-row: 2; }
+    main.has-data #list-section { grid-column: 1; grid-row: 3; }
+    main.has-data #summary-panel {
+      grid-column: 2;
+      grid-row: 1 / span 3;
+      position: sticky;
+      top: 84px;
+      max-height: calc(100vh - 104px);
+      overflow-y: auto;
+    }
+    .selection-bar, #summary-back-bar { display: none !important; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>いいねリキャップ</h1>
+</header>
+<main>
+  <section class="panel" id="load-panel">
+    <div class="drop-zone" id="drop-zone">
+      <p><strong>アーカイブの.zip または like.js をここにドロップ</strong><br>またはタップして選択</p>
+      <p>Xの「データのアーカイブをダウンロード」でもらえる<br>zipファイルをそのまま読み込めます(中の<code>data/like.js</code>を自動で探します)</p>
+      <p>複数ファイルをまとめて選択/ドロップすると、既存の内容に追加(重複は自動で除外)されます</p>
+    </div>
+    <input type="file" id="file-input" accept=".js,.txt,.zip,application/javascript,text/javascript,text/plain,application/zip" multiple />
+    <div class="error-box" id="error-box" hidden></div>
+    <details class="help">
+      <summary>like.js の取得方法</summary>
+      <ol>
+        <li>X (旧Twitter) アプリ or ブラウザで設定 →「アカウント」→「データのアーカイブをダウンロード」をリクエスト</li>
+        <li>準備ができたらメール通知が届くので、アーカイブ(zip)をダウンロード</li>
+        <li>ダウンロードした <code>.zip</code> をそのままこのアプリにドロップ(展開して <code>data/like.js</code> を取り出しても、それを直接ドロップしてもOK)</li>
+      </ol>
+    </details>
+  </section>
+
+  <section class="panel" id="result-panel" hidden>
+    <div class="status-line">
+      <div class="count"><strong id="result-count">0</strong>件表示中(全<span id="total-count">0</span>件)</div>
+      <button class="btn secondary" id="clear-all-btn">すべてクリア</button>
+    </div>
+    <div class="preset-row" id="preset-row">
+      <button type="button" class="preset-chip" data-preset="all">全期間</button>
+      <button type="button" class="preset-chip" data-preset="30d">過去30日</button>
+      <button type="button" class="preset-chip" data-preset="6m">過去6ヶ月</button>
+      <button type="button" class="preset-chip" data-preset="year" id="year-preset-btn">今年</button>
+      <button type="button" class="preset-chip" id="custom-range-btn" data-preset="custom">
+        <span id="custom-range-label">📅 期間を指定</span>
+      </button>
+    </div>
+    <div class="filter-row">
+      <label>並び順
+        <select id="sort-order">
+          <option value="desc">新しい順</option>
+          <option value="asc">古い順</option>
+          <option value="random">ランダム</option>
+        </select>
+      </label>
+    </div>
+    <p class="note">※ Xのアーカイブには「いいねした日時」自体は含まれていないため、ここでの日付は各ポストが<strong>投稿された日時</strong>を基準にしています。</p>
+  </section>
+
+  <section id="list-section" hidden>
+    <div class="post-list" id="post-list"></div>
+    <div class="empty-state" id="empty-state" hidden>この期間に該当するいいねはありません</div>
+  </section>
+
+  <section class="panel" id="summary-panel" hidden>
+    <div class="status-line">
+      <div class="count"><strong id="summary-count">0</strong>件をまとめました</div>
+    </div>
+    <div class="summary-actions">
+      <button class="btn" id="copy-btn">テキストをコピー</button>
+      <button class="btn secondary" id="share-btn" hidden>共有</button>
+      <button class="btn secondary" id="download-btn" hidden>ダウンロード</button>
+      <span class="copy-toast" id="copy-toast" hidden>コピーしました</span>
+    </div>
+    <p class="embed-loading" id="summary-loading" hidden>埋め込みポストを読み込み中…</p>
+    <p class="embed-error" id="summary-embed-error" hidden>埋め込みポストを読み込めませんでした。ネットワーク接続を確認してください。</p>
+    <p class="summary-placeholder" id="summary-placeholder">左のチェックボックスでポストを選択すると、ここにまとめて表示されます</p>
+    <div class="tweet-embed-list" id="summary-list"></div>
+  </section>
+</main>
+
+<div class="global-toast" id="global-toast" hidden></div>
+
+<div class="floating-bar selection-bar" id="selection-bar" hidden>
+  <span id="selection-count">0件選択中</span>
+  <div class="selection-bar-actions">
+    <button class="btn secondary" id="clear-selection-btn">選択解除</button>
+    <button class="btn" id="summarize-btn">まとめて表示</button>
+  </div>
+</div>
+
+<div class="floating-bar back-bar" id="summary-back-bar" hidden>
+  <button class="btn" id="back-to-list-btn">← 一覧に戻る</button>
+</div>
+
+<div class="calendar-overlay" id="calendar-overlay" hidden>
+  <div class="calendar-panel">
+    <div class="calendar-range-label" id="calendar-range-label">開始日を選択してください</div>
+    <div class="calendar-header">
+      <button type="button" class="calendar-nav" id="calendar-prev-month" aria-label="前の月">‹</button>
+      <span id="calendar-month-label">2025年9月</span>
+      <button type="button" class="calendar-nav" id="calendar-next-month" aria-label="次の月">›</button>
+    </div>
+    <div class="calendar-weekdays">
+      <span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span>
+    </div>
+    <div class="calendar-grid" id="calendar-grid"></div>
+    <div class="calendar-actions">
+      <button type="button" class="btn secondary" id="calendar-cancel-btn">キャンセル</button>
+      <button type="button" class="btn" id="calendar-apply-btn">適用</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const mainEl = document.querySelector('main');
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
+  const errorBox = document.getElementById('error-box');
+  const loadPanel = document.getElementById('load-panel');
+  const resultPanel = document.getElementById('result-panel');
+  const listSection = document.getElementById('list-section');
+  const postList = document.getElementById('post-list');
+  const emptyState = document.getElementById('empty-state');
+  const resultCount = document.getElementById('result-count');
+  const totalCount = document.getElementById('total-count');
+  const presetRow = document.getElementById('preset-row');
+  const customRangeLabel = document.getElementById('custom-range-label');
+  const calendarOverlay = document.getElementById('calendar-overlay');
+  const calendarRangeLabel = document.getElementById('calendar-range-label');
+  const calendarMonthLabel = document.getElementById('calendar-month-label');
+  const calendarGrid = document.getElementById('calendar-grid');
+  const calendarPrevBtn = document.getElementById('calendar-prev-month');
+  const calendarNextBtn = document.getElementById('calendar-next-month');
+  const calendarCancelBtn = document.getElementById('calendar-cancel-btn');
+  const calendarApplyBtn = document.getElementById('calendar-apply-btn');
+  const sortOrderSelect = document.getElementById('sort-order');
+  const selectionBar = document.getElementById('selection-bar');
+  const selectionCount = document.getElementById('selection-count');
+  const clearSelectionBtn = document.getElementById('clear-selection-btn');
+  const summarizeBtn = document.getElementById('summarize-btn');
+  const summaryPanel = document.getElementById('summary-panel');
+  const summaryList = document.getElementById('summary-list');
+  const summaryCount = document.getElementById('summary-count');
+  const backToListBtn = document.getElementById('back-to-list-btn');
+  const summaryBackBar = document.getElementById('summary-back-bar');
+  const clearAllBtn = document.getElementById('clear-all-btn');
+  const copyBtn = document.getElementById('copy-btn');
+  const shareBtn = document.getElementById('share-btn');
+  const downloadBtn = document.getElementById('download-btn');
+  const copyToast = document.getElementById('copy-toast');
+  const globalToast = document.getElementById('global-toast');
+  const summaryLoading = document.getElementById('summary-loading');
+  const summaryEmbedError = document.getElementById('summary-embed-error');
+  const summaryPlaceholder = document.getElementById('summary-placeholder');
+  const desktopMediaQuery = window.matchMedia('(min-width: 1024px)');
+
+  const TWITTER_EPOCH = 1288834974657n;
+  let likes = []; // [{ id, text, url, date }]
+  let selectedIds = new Set();
+  let currentSummaryList = [];
+  let desktopEmbeddedIds = new Set();
+
+  function isDesktopLayout() {
+    return desktopMediaQuery.matches;
+  }
+  let filterStartDate = null; // 'YYYY-MM-DD'
+  let filterEndDate = null;
+  let calendarViewMonth = new Date();
+  let calendarTempStart = null; // Date
+  let calendarTempEnd = null; // Date
+
+  function tweetIdToDate(idStr) {
+    try {
+      const id = BigInt(idStr);
+      const ms = (id >> 22n) + TWITTER_EPOCH;
+      return new Date(Number(ms));
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function showError(message) {
+    errorBox.textContent = message;
+    errorBox.hidden = false;
+  }
+
+  function clearError() {
+    errorBox.hidden = true;
+    errorBox.textContent = '';
+  }
+
+  function parseLikeJs(text) {
+    const start = text.indexOf('[');
+    const end = text.lastIndexOf(']');
+    if (start === -1 || end === -1 || end < start) {
+      throw new Error('like.js の中身を認識できませんでした。');
+    }
+    const jsonSlice = text.slice(start, end + 1);
+    let raw;
+    try {
+      raw = JSON.parse(jsonSlice);
+    } catch (e) {
+      throw new Error('like.js の中身を認識できませんでした。');
+    }
+    if (!Array.isArray(raw)) throw new Error('想定していない形式です。');
+
+    const parsed = [];
+    for (const entry of raw) {
+      const like = entry && entry.like;
+      if (!like || !like.tweetId) continue;
+      const date = tweetIdToDate(like.tweetId);
+      parsed.push({
+        id: like.tweetId,
+        text: like.fullText || '(本文なし)',
+        url: like.expandedUrl || ('https://x.com/i/web/status/' + like.tweetId),
+        date: date,
+      });
+    }
+    return parsed;
+  }
+
+  function handleFiles(fileList) {
+    clearError();
+    const files = Array.from(fileList || []);
+    if (files.length === 0) return;
+
+    Promise.all(files.map(readOneFile)).then((results) => {
+      const merged = [];
+      const errors = [];
+      for (const r of results) {
+        if (r.error) errors.push(r.error);
+        else merged.push(...r.parsed);
+      }
+      if (merged.length > 0) {
+        mergeLikes(merged);
+      }
+      if (errors.length > 0) {
+        showError(errors.join(' / '));
+      } else if (merged.length === 0) {
+        showError('いいねのデータが見つかりませんでした。ファイルの中身を確認してください。');
+      }
+    });
+  }
+
+  function readOneFile(file) {
+    const name = file.name || '(名前なし)';
+    const isZip = /\.zip$/i.test(name) ||
+      file.type === 'application/zip' ||
+      file.type === 'application/x-zip-compressed';
+    if (isZip) return readZipFile(file, name);
+    if (!/\.(js|txt)$/i.test(name)) {
+      return Promise.resolve({ error: `${name}: 対応していないファイル形式です` });
+    }
+    return file.text()
+      .then((text) => parseFileText(text, name))
+      .catch(() => ({ error: `${name}: ファイルの読み込みに失敗しました` }));
+  }
+
+  function readZipFile(file, name) {
+    if (typeof JSZip === 'undefined') {
+      return Promise.resolve({ error: `${name}: zip解凍ライブラリを読み込めませんでした` });
+    }
+    return JSZip.loadAsync(file).then((zip) => {
+      const matches = zip.file(/(^|\/)like\.js$/i);
+      const entry = matches && matches[0];
+      if (!entry) return { error: `${name}: zipの中に like.js が見つかりませんでした` };
+      return entry.async('string').then((text) => parseFileText(text, name));
+    }).catch(() => ({ error: `${name}: zipファイルの読み込みに失敗しました(壊れていないか確認してください)` }));
+  }
+
+  function parseFileText(text, name) {
+    try {
+      const parsed = parseLikeJs(text);
+      if (parsed.length === 0) return { error: `${name}: いいねのデータが見つかりませんでした` };
+      return { parsed };
+    } catch (e) {
+      return { error: `${name}: ${e.message}` };
+    }
+  }
+
+  function mergeLikes(newItems) {
+    const map = new Map();
+    for (const l of likes) map.set(l.id, l);
+    for (const l of newItems) map.set(l.id, l);
+    likes = Array.from(map.values());
+    selectedIds.clear();
+    desktopEmbeddedIds.clear();
+    summaryPanel.hidden = true;
+    summaryBackBar.hidden = true;
+    selectionBar.hidden = true;
+    onLoaded();
+  }
+
+  function onLoaded() {
+    totalCount.textContent = likes.length;
+    resultPanel.hidden = false;
+    listSection.hidden = false;
+    mainEl.classList.add('has-data');
+    updateYearPresetLabel();
+    applyPreset('all');
+    if (isDesktopLayout()) {
+      summaryPanel.hidden = false;
+      renderDesktopSummary();
+    }
+  }
+
+  function getDataDateRange() {
+    const dated = likes.filter((l) => l.date);
+    if (dated.length === 0) return null;
+    const times = dated.map((l) => l.date.getTime());
+    return { min: new Date(Math.min(...times)), max: new Date(Math.max(...times)) };
+  }
+
+  function updateYearPresetLabel() {
+    document.getElementById('year-preset-btn').textContent = `${new Date().getFullYear()}年`;
+  }
+
+  function applyPreset(preset) {
+    const range = getDataDateRange();
+    if (!range) return;
+    const today = new Date();
+    let end = range.max;
+    let start = range.min;
+    if (preset === '30d') {
+      end = today; start = new Date(today); start.setDate(start.getDate() - 29);
+    } else if (preset === '6m') {
+      end = today; start = new Date(today); start.setMonth(start.getMonth() - 6);
+    } else if (preset === 'year') {
+      start = new Date(today.getFullYear(), 0, 1);
+      end = new Date(today.getFullYear(), 11, 31);
+    }
+    if (start < range.min) start = range.min;
+    filterStartDate = toDateInputValue(start);
+    filterEndDate = toDateInputValue(end);
+    setActivePreset(preset);
+    render();
+  }
+
+  function setActivePreset(preset) {
+    presetRow.querySelectorAll('.preset-chip').forEach((chip) => {
+      chip.classList.toggle('active', chip.dataset.preset === preset);
+    });
+    if (preset === 'custom') {
+      customRangeLabel.textContent = `📅 ${filterStartDate.replace(/-/g, '/')} 〜 ${filterEndDate.replace(/-/g, '/')}`;
+    } else {
+      customRangeLabel.textContent = '📅 期間を指定';
+    }
+  }
+
+  function toDateInputValue(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+  }
+
+  function formatDateTime(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return `${y}/${m}/${day} ${hh}:${mm}`;
+  }
+
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function render() {
+    const startTime = filterStartDate ? new Date(filterStartDate + 'T00:00:00').getTime() : -Infinity;
+    const endTime = filterEndDate ? new Date(filterEndDate + 'T23:59:59').getTime() : Infinity;
+
+    let filtered = likes.filter((l) => {
+      if (!l.date) return false;
+      const t = l.date.getTime();
+      return t >= startTime && t <= endTime;
+    });
+
+    if (sortOrderSelect.value === 'random') {
+      filtered = shuffle(filtered);
+    } else {
+      filtered.sort((a, b) => {
+        const diff = a.date.getTime() - b.date.getTime();
+        return sortOrderSelect.value === 'asc' ? diff : -diff;
+      });
+    }
+
+    resultCount.textContent = filtered.length;
+    postList.innerHTML = '';
+
+    if (filtered.length === 0) {
+      emptyState.hidden = false;
+      return;
+    }
+    emptyState.hidden = true;
+
+    const frag = document.createDocumentFragment();
+    for (const l of filtered) {
+      frag.appendChild(createPostCard(l));
+    }
+    postList.appendChild(frag);
+  }
+
+  const HEART_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="vertical-align:-2px"><path d="M12 21.638h-.014C9.403 21.59 1.95 14.856 1.95 8.478c0-3.064 2.525-5.754 5.403-5.754 2.29 0 3.83 1.58 4.646 2.73.814-1.148 2.354-2.73 4.645-2.73 2.88 0 5.404 2.69 5.404 5.755 0 6.376-7.454 13.11-10.037 13.157Z"/></svg>';
+
+  function formatXDate(d) {
+    const h = d.getHours();
+    const ampm = h < 12 ? '午前' : '午後';
+    const h12 = h % 12;
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return `${ampm}${h12}:${mm} · ${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+  }
+
+  function createPostCard(l) {
+    const card = document.createElement('div');
+    card.className = 'post-card selectable';
+    if (selectedIds.has(l.id)) card.classList.add('selected');
+
+    const top = document.createElement('div');
+    top.className = 'card-top';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = selectedIds.has(l.id);
+    checkbox.addEventListener('click', (e) => e.stopPropagation());
+    checkbox.addEventListener('change', () => toggleSelection(l.id, card, checkbox.checked));
+    top.appendChild(checkbox);
+
+    const body = document.createElement('div');
+    body.style.flex = '1';
+    body.style.minWidth = '0';
+
+    const header = document.createElement('div');
+    header.className = 'x-header';
+
+    const badge = document.createElement('span');
+    badge.className = 'x-badge';
+    badge.textContent = 'X';
+    header.appendChild(badge);
+
+    const dateEl = document.createElement('span');
+    dateEl.className = 'date';
+    dateEl.textContent = formatXDate(l.date);
+    header.appendChild(dateEl);
+
+    const bodyEl = document.createElement('div');
+    bodyEl.className = 'body';
+    bodyEl.textContent = l.text;
+
+    const footer = document.createElement('div');
+    footer.className = 'card-footer';
+
+    const likedEl = document.createElement('span');
+    likedEl.className = 'liked-indicator';
+    likedEl.innerHTML = HEART_SVG + ' いいね済み';
+    footer.appendChild(likedEl);
+
+    const linkEl = document.createElement('a');
+    linkEl.className = 'open-link';
+    linkEl.href = l.url;
+    linkEl.target = '_blank';
+    linkEl.rel = 'noopener noreferrer';
+    linkEl.textContent = 'Xで開く →';
+    linkEl.addEventListener('click', (e) => e.stopPropagation());
+    footer.appendChild(linkEl);
+
+    body.appendChild(header);
+    body.appendChild(bodyEl);
+    body.appendChild(footer);
+    top.appendChild(body);
+    card.appendChild(top);
+
+    card.addEventListener('click', () => {
+      copyUrl(l.url, card);
+    });
+
+    return card;
+  }
+
+  function copyUrl(url, card) {
+    if (!navigator.clipboard) {
+      showGlobalToast('コピーに失敗しました');
+      return;
+    }
+    navigator.clipboard.writeText(url)
+      .then(() => {
+        showGlobalToast('URLをコピーしました');
+        flashCard(card);
+      })
+      .catch(() => showGlobalToast('コピーに失敗しました'));
+  }
+
+  function flashCard(card) {
+    card.classList.add('copied-flash');
+    setTimeout(() => card.classList.remove('copied-flash'), 400);
+  }
+
+  let globalToastTimer = null;
+  function showGlobalToast(message) {
+    globalToast.textContent = message;
+    globalToast.hidden = false;
+    clearTimeout(globalToastTimer);
+    globalToastTimer = setTimeout(() => { globalToast.hidden = true; }, 1500);
+  }
+
+  function toggleSelection(id, card, isSelected) {
+    if (isSelected) {
+      selectedIds.add(id);
+    } else {
+      selectedIds.delete(id);
+    }
+    if (card) card.classList.toggle('selected', isSelected);
+    updateSelectionBar();
+    if (isDesktopLayout()) {
+      renderDesktopSummary();
+    }
+  }
+
+  function updateSelectionBar() {
+    const count = selectedIds.size;
+    selectionCount.textContent = count + '件選択中';
+    selectionBar.hidden = count === 0;
+  }
+
+  function getSelectedLikes() {
+    let selected = likes.filter((l) => selectedIds.has(l.id));
+    if (sortOrderSelect.value === 'random') {
+      selected = shuffle(selected);
+    } else {
+      selected.sort((a, b) => {
+        const diff = a.date.getTime() - b.date.getTime();
+        return sortOrderSelect.value === 'asc' ? diff : -diff;
+      });
+    }
+    return selected;
+  }
+
+  function getSelectedLikesInSelectionOrder() {
+    const map = new Map(likes.map((l) => [l.id, l]));
+    const result = [];
+    for (const id of selectedIds) {
+      const l = map.get(id);
+      if (l) result.push(l);
+    }
+    return result;
+  }
+
+  function renderDesktopSummary() {
+    const selected = getSelectedLikesInSelectionOrder();
+    currentSummaryList = selected;
+    summaryCount.textContent = selected.length;
+
+    if (selected.length === 0) {
+      summaryList.innerHTML = '';
+      desktopEmbeddedIds.clear();
+      summaryPlaceholder.hidden = false;
+      summaryLoading.hidden = true;
+      summaryEmbedError.hidden = true;
+      return;
+    }
+    summaryPlaceholder.hidden = true;
+
+    const currentIds = new Set(selected.map((l) => l.id));
+    summaryList.querySelectorAll('[data-embed-id]').forEach((el) => {
+      if (!currentIds.has(el.dataset.embedId)) {
+        el.remove();
+        desktopEmbeddedIds.delete(el.dataset.embedId);
+      }
+    });
+
+    const toAdd = selected.filter((l) => !desktopEmbeddedIds.has(l.id));
+    if (toAdd.length === 0) return;
+
+    summaryEmbedError.hidden = true;
+    summaryLoading.hidden = false;
+
+    const frag = document.createDocumentFragment();
+    for (const l of toAdd) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'tweet-embed';
+      wrapper.dataset.embedId = l.id;
+      const blockquote = document.createElement('blockquote');
+      blockquote.className = 'twitter-tweet';
+      blockquote.setAttribute('data-dnt', 'true');
+      const a = document.createElement('a');
+      a.href = l.url;
+      blockquote.appendChild(a);
+      wrapper.appendChild(blockquote);
+      frag.appendChild(wrapper);
+      desktopEmbeddedIds.add(l.id);
+    }
+    summaryList.appendChild(frag);
+
+    loadTwitterWidgets()
+      .then((twttr) => twttr.widgets.load(summaryList))
+      .then(() => { summaryLoading.hidden = true; })
+      .catch(() => {
+        summaryLoading.hidden = true;
+        summaryEmbedError.hidden = false;
+      });
+  }
+
+  function formatSummaryText(list) {
+    return list.map((l) => `${formatDateTime(l.date)}\n${l.text}\n${l.url}`).join('\n\n');
+  }
+
+  let twitterWidgetsPromise = null;
+  function loadTwitterWidgets() {
+    if (twitterWidgetsPromise) return twitterWidgetsPromise;
+    twitterWidgetsPromise = new Promise((resolve, reject) => {
+      if (window.twttr && window.twttr.widgets) {
+        resolve(window.twttr);
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://platform.twitter.com/widgets.js';
+      script.async = true;
+      script.onload = () => resolve(window.twttr);
+      script.onerror = () => reject(new Error('widgets.js load failed'));
+      document.head.appendChild(script);
+    });
+    return twitterWidgetsPromise;
+  }
+
+  function showSummary() {
+    currentSummaryList = getSelectedLikes();
+    summaryCount.textContent = currentSummaryList.length;
+    summaryList.innerHTML = '';
+    summaryLoading.hidden = false;
+    summaryEmbedError.hidden = true;
+
+    const frag = document.createDocumentFragment();
+    for (const l of currentSummaryList) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'tweet-embed';
+      const blockquote = document.createElement('blockquote');
+      blockquote.className = 'twitter-tweet';
+      blockquote.setAttribute('data-dnt', 'true');
+      const a = document.createElement('a');
+      a.href = l.url;
+      blockquote.appendChild(a);
+      wrapper.appendChild(blockquote);
+      frag.appendChild(wrapper);
+    }
+    summaryList.appendChild(frag);
+
+    resultPanel.hidden = true;
+    listSection.hidden = true;
+    selectionBar.hidden = true;
+    summaryPanel.hidden = false;
+    summaryBackBar.hidden = false;
+    window.scrollTo(0, 0);
+
+    if (currentSummaryList.length === 0) {
+      summaryLoading.hidden = true;
+      return;
+    }
+
+    loadTwitterWidgets()
+      .then((twttr) => twttr.widgets.load(summaryList))
+      .then(() => { summaryLoading.hidden = true; })
+      .catch(() => {
+        summaryLoading.hidden = true;
+        summaryEmbedError.hidden = false;
+      });
+  }
+
+  function backToList() {
+    summaryPanel.hidden = true;
+    summaryBackBar.hidden = true;
+    resultPanel.hidden = false;
+    listSection.hidden = false;
+    updateSelectionBar();
+  }
+
+  function showCopyToast(message) {
+    copyToast.textContent = message;
+    copyToast.hidden = false;
+    setTimeout(() => { copyToast.hidden = true; }, 2000);
+  }
+
+  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('drag-over');
+  });
+  dropZone.addEventListener('dragleave', () => {
+    dropZone.classList.remove('drag-over');
+  });
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    handleFiles(e.dataTransfer.files);
+  });
+  fileInput.addEventListener('change', () => {
+    const files = fileInput.files;
+    handleFiles(files);
+    fileInput.value = '';
+  });
+
+  sortOrderSelect.addEventListener('change', render);
+
+  desktopMediaQuery.addEventListener('change', (e) => {
+    if (likes.length === 0) return;
+    if (e.matches) {
+      summaryPanel.hidden = false;
+      renderDesktopSummary();
+    } else {
+      summaryPanel.hidden = true;
+    }
+  });
+
+  presetRow.querySelectorAll('.preset-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const preset = chip.dataset.preset;
+      if (preset === 'custom') {
+        openCalendar();
+      } else {
+        applyPreset(preset);
+      }
+    });
+  });
+
+  function openCalendar() {
+    calendarTempStart = filterStartDate ? new Date(filterStartDate + 'T00:00:00') : null;
+    calendarTempEnd = filterEndDate ? new Date(filterEndDate + 'T00:00:00') : null;
+    calendarViewMonth = calendarTempStart
+      ? new Date(calendarTempStart.getFullYear(), calendarTempStart.getMonth(), 1)
+      : new Date();
+    renderCalendar();
+    calendarOverlay.hidden = false;
+  }
+
+  function closeCalendar() {
+    calendarOverlay.hidden = true;
+  }
+
+  function renderCalendar() {
+    const year = calendarViewMonth.getFullYear();
+    const month = calendarViewMonth.getMonth();
+    calendarMonthLabel.textContent = `${year}年${month + 1}月`;
+
+    const firstDay = new Date(year, month, 1);
+    const startOffset = firstDay.getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+    calendarGrid.innerHTML = '';
+    for (let i = 0; i < 42; i++) {
+      const dayNum = i - startOffset + 1;
+      let cellDate;
+      let otherMonth = false;
+      if (dayNum < 1) {
+        cellDate = new Date(year, month - 1, daysInPrevMonth + dayNum);
+        otherMonth = true;
+      } else if (dayNum > daysInMonth) {
+        cellDate = new Date(year, month + 1, dayNum - daysInMonth);
+        otherMonth = true;
+      } else {
+        cellDate = new Date(year, month, dayNum);
+      }
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'calendar-day';
+      btn.textContent = cellDate.getDate();
+      if (otherMonth) btn.classList.add('other-month');
+
+      const t = cellDate.getTime();
+      if (calendarTempStart && t === calendarTempStart.getTime()) btn.classList.add('range-start');
+      if (calendarTempEnd && t === calendarTempEnd.getTime()) btn.classList.add('range-end');
+      if (calendarTempStart && calendarTempEnd && t > calendarTempStart.getTime() && t < calendarTempEnd.getTime()) {
+        btn.classList.add('in-range');
+      }
+
+      btn.addEventListener('click', () => onCalendarDayClick(cellDate));
+      calendarGrid.appendChild(btn);
+    }
+
+    updateCalendarRangeLabel();
+  }
+
+  function onCalendarDayClick(date) {
+    if (!calendarTempStart || calendarTempEnd) {
+      calendarTempStart = date;
+      calendarTempEnd = null;
+    } else if (date.getTime() < calendarTempStart.getTime()) {
+      calendarTempEnd = calendarTempStart;
+      calendarTempStart = date;
+    } else {
+      calendarTempEnd = date;
+    }
+    renderCalendar();
+  }
+
+  function updateCalendarRangeLabel() {
+    if (calendarTempStart && calendarTempEnd) {
+      calendarRangeLabel.textContent = `${toDateInputValue(calendarTempStart).replace(/-/g, '/')} 〜 ${toDateInputValue(calendarTempEnd).replace(/-/g, '/')}`;
+    } else if (calendarTempStart) {
+      calendarRangeLabel.textContent = `${toDateInputValue(calendarTempStart).replace(/-/g, '/')} 〜 終了日を選択してください`;
+    } else {
+      calendarRangeLabel.textContent = '開始日を選択してください';
+    }
+  }
+
+  calendarPrevBtn.addEventListener('click', () => {
+    calendarViewMonth = new Date(calendarViewMonth.getFullYear(), calendarViewMonth.getMonth() - 1, 1);
+    renderCalendar();
+  });
+  calendarNextBtn.addEventListener('click', () => {
+    calendarViewMonth = new Date(calendarViewMonth.getFullYear(), calendarViewMonth.getMonth() + 1, 1);
+    renderCalendar();
+  });
+  calendarCancelBtn.addEventListener('click', closeCalendar);
+  calendarApplyBtn.addEventListener('click', () => {
+    if (!calendarTempStart) {
+      closeCalendar();
+      return;
+    }
+    const end = calendarTempEnd || calendarTempStart;
+    filterStartDate = toDateInputValue(calendarTempStart);
+    filterEndDate = toDateInputValue(end);
+    setActivePreset('custom');
+    render();
+    closeCalendar();
+  });
+  calendarOverlay.addEventListener('click', (e) => {
+    if (e.target === calendarOverlay) closeCalendar();
+  });
+
+  clearAllBtn.addEventListener('click', () => {
+    likes = [];
+    selectedIds.clear();
+    desktopEmbeddedIds.clear();
+    mainEl.classList.remove('has-data');
+    resultPanel.hidden = true;
+    listSection.hidden = true;
+    summaryPanel.hidden = true;
+    selectionBar.hidden = true;
+    summaryBackBar.hidden = true;
+    clearError();
+  });
+
+  clearSelectionBtn.addEventListener('click', () => {
+    selectedIds.clear();
+    render();
+    updateSelectionBar();
+    if (isDesktopLayout()) {
+      renderDesktopSummary();
+    }
+  });
+
+  summarizeBtn.addEventListener('click', showSummary);
+  backToListBtn.addEventListener('click', backToList);
+
+  copyBtn.addEventListener('click', () => {
+    const text = formatSummaryText(currentSummaryList);
+    navigator.clipboard.writeText(text)
+      .then(() => showCopyToast('コピーしました'))
+      .catch(() => showCopyToast('コピーに失敗しました'));
+  });
+
+  if (navigator.share) {
+    shareBtn.hidden = false;
+  } else {
+    downloadBtn.hidden = false;
+  }
+
+  shareBtn.addEventListener('click', () => {
+    const text = formatSummaryText(currentSummaryList);
+    navigator.share({ text }).catch(() => {});
+  });
+
+  downloadBtn.addEventListener('click', () => {
+    const text = formatSummaryText(currentSummaryList);
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `いいねまとめ_${y}${m}${d}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+  }
+})();
+</script>
+</body>
+</html>
