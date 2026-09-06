@@ -32,8 +32,8 @@ X (旧Twitter) の公式データアーカイブに含まれる `like.js` を読
 
 ## 技術構成
 
-- 素のHTML/CSS/JavaScript(ビルド不要)
-- zipファイルの解凍のみ [JSZip](https://stuk.github.io/jszip/) をCDN経由で利用
+- 素のHTML/CSS/JavaScript(ビルド不要、外部ライブラリ不使用)
+- zip解凍はブラウザ標準の `DecompressionStream` を使った自前実装。zip全体をメモリに読み込まず、`data/like.js` エントリのバイト範囲だけを `Blob.slice()` で切り出して解凍するため、数GB規模のアーカイブ(動画・画像を含むもの)でも問題なく読み込める
 - 「まとめて表示」の埋め込みポストのみ `platform.twitter.com/widgets.js` をオンデマンド読み込み(初回「まとめて表示」時のみ)
 - `like.js`(JSラッパー付きJSON)をパースし、各ポストIDからSnowflake形式で投稿日時を算出
 - ファイル処理はすべてブラウザ内で完結(外部送信・サーバー保存なし)

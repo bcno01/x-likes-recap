@@ -8,7 +8,6 @@
 <link rel="icon" href="icons/icon-192.png" />
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
 <meta name="theme-color" content="#ffffff" />
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   :root {
     --bg: #ffffff;
@@ -772,19 +771,107 @@
   }
 
   function readZipFile(file, name) {
-    if (typeof JSZip === 'undefined') {
-      return Promise.resolve({ error: `${name}: zip解凍ライブラリを読み込めませんでした` });
+    return extractLikeJsFromZip(file)
+      .then((text) => {
+        if (text == null) return { error: `${name}: zipの中に like.js が見つかりませんでした` };
+        return parseFileText(text, name);
+      })
+      .catch((e) => {
+        const sizeMB = (file.size / (1024 * 1024)).toFixed(0);
+        const detail = e && e.message ? e.message : '不明なエラー';
+        return { error: `${name}(${sizeMB}MB): zipファイルの読み込みに失敗しました(${detail})` };
+      });
+  }
+
+  const ZIP_EOCD_SIG = 0x06054b50;
+  const ZIP_CD_SIG = 0x02014b50;
+  const ZIP_LOCAL_SIG = 0x04034b50;
+
+  // zip全体をメモリに読まず、data/like.js エントリのバイト範囲だけを
+  // Blob.slice() で切り出して解凍する(数GB規模のアーカイブに対応するため)。
+  async function extractLikeJsFromZip(file) {
+    const eocd = await findEndOfCentralDirectory(file);
+    if (!eocd) throw new Error('ZIPの構造を認識できませんでした');
+    if (eocd.needsZip64) {
+      throw new Error('このzipは大きすぎる/ファイル数が多すぎる形式(ZIP64)で対応できません。展開してdata/like.jsを直接ドロップしてください');
     }
-    return JSZip.loadAsync(file).then((zip) => {
-      const matches = zip.file(/(^|\/)like\.js$/i);
-      const entry = matches && matches[0];
-      if (!entry) return { error: `${name}: zipの中に like.js が見つかりませんでした` };
-      return entry.async('string').then((text) => parseFileText(text, name));
-    }).catch((e) => {
-      const sizeMB = (file.size / (1024 * 1024)).toFixed(0);
-      const detail = e && e.message ? e.message : '不明なエラー';
-      return { error: `${name}(${sizeMB}MB): zipファイルの読み込みに失敗しました(${detail})` };
-    });
+
+    const cdBuf = await file.slice(eocd.cdOffset, eocd.cdOffset + eocd.cdSize).arrayBuffer();
+    const entry = findLikeJsEntry(cdBuf, eocd.totalEntries);
+    if (!entry) return null;
+
+    const localHeaderBuf = await file.slice(entry.localHeaderOffset, entry.localHeaderOffset + 30).arrayBuffer();
+    const localView = new DataView(localHeaderBuf);
+    if (localView.getUint32(0, true) !== ZIP_LOCAL_SIG) {
+      throw new Error('ローカルファイルヘッダーを認識できませんでした');
+    }
+    const nameLen = localView.getUint16(26, true);
+    const extraLen = localView.getUint16(28, true);
+    const dataStart = entry.localHeaderOffset + 30 + nameLen + extraLen;
+    const compressedBuf = await file.slice(dataStart, dataStart + entry.compressedSize).arrayBuffer();
+
+    let bytes;
+    if (entry.method === 0) {
+      bytes = new Uint8Array(compressedBuf);
+    } else if (entry.method === 8) {
+      bytes = await inflateRaw(compressedBuf);
+    } else {
+      throw new Error(`対応していない圧縮方式です(method=${entry.method})`);
+    }
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+
+  async function findEndOfCentralDirectory(file) {
+    const maxCommentLen = 65535;
+    const searchSize = Math.min(file.size, 22 + maxCommentLen);
+    const tailOffset = file.size - searchSize;
+    const tailBuf = await file.slice(tailOffset, file.size).arrayBuffer();
+    const tail = new Uint8Array(tailBuf);
+
+    for (let i = tail.length - 22; i >= 0; i--) {
+      if (tail[i] === 0x50 && tail[i + 1] === 0x4b && tail[i + 2] === 0x05 && tail[i + 3] === 0x06) {
+        const view = new DataView(tailBuf, i);
+        const totalEntries = view.getUint16(10, true);
+        const cdSize = view.getUint32(12, true);
+        const cdOffset = view.getUint32(16, true);
+        const needsZip64 = cdOffset === 0xffffffff || cdSize === 0xffffffff || totalEntries === 0xffff;
+        return { cdOffset, cdSize, totalEntries, needsZip64 };
+      }
+    }
+    return null;
+  }
+
+  function findLikeJsEntry(cdBuf, totalEntries) {
+    const view = new DataView(cdBuf);
+    const bytes = new Uint8Array(cdBuf);
+    const decoder = new TextDecoder('utf-8');
+    let offset = 0;
+    for (let i = 0; i < totalEntries; i++) {
+      if (offset + 46 > cdBuf.byteLength) break;
+      const sig = view.getUint32(offset, true);
+      if (sig !== ZIP_CD_SIG) break;
+      const method = view.getUint16(offset + 10, true);
+      const compressedSize = view.getUint32(offset + 20, true);
+      const nameLen = view.getUint16(offset + 28, true);
+      const extraLen = view.getUint16(offset + 30, true);
+      const commentLen = view.getUint16(offset + 32, true);
+      const localHeaderOffset = view.getUint32(offset + 42, true);
+      const name = decoder.decode(bytes.slice(offset + 46, offset + 46 + nameLen));
+      if (/(^|\/)like\.js$/i.test(name)) {
+        return { method, compressedSize, localHeaderOffset, name };
+      }
+      offset += 46 + nameLen + extraLen + commentLen;
+    }
+    return null;
+  }
+
+  async function inflateRaw(compressedBuf) {
+    if (typeof DecompressionStream === 'undefined') {
+      throw new Error('お使いのブラウザがzip解凍(DecompressionStream)に対応していません。ブラウザを最新版に更新してください');
+    }
+    const stream = new Blob([compressedBuf]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    const buf = await new Response(stream).arrayBuffer();
+    return new Uint8Array(buf);
   }
 
   function parseFileText(text, name) {
@@ -1108,7 +1195,7 @@
       blockquote.className = 'twitter-tweet';
       blockquote.setAttribute('data-dnt', 'true');
       const a = document.createElement('a');
-      a.href = l.url;
+      a.href = embedUrlFor(l);
       blockquote.appendChild(a);
       wrapper.appendChild(blockquote);
       frag.appendChild(wrapper);
@@ -1123,6 +1210,14 @@
         summaryLoading.hidden = true;
         summaryEmbedError.hidden = false;
       });
+  }
+
+  // Xの公式アーカイブの expandedUrl は "https://twitter.com/i/web/status/{id}"
+  // 形式のことがあり、これは通常のリンクとしては機能するが埋め込み(oEmbed)API
+  // には "web" セグメントが認識されず404になる。埋め込み生成時はIDから
+  // "i/status/{id}" 形式のURLを組み立てて回避する。
+  function embedUrlFor(l) {
+    return `https://x.com/i/status/${l.id}`;
   }
 
   function formatSummaryText(list) {
@@ -1162,7 +1257,7 @@
       blockquote.className = 'twitter-tweet';
       blockquote.setAttribute('data-dnt', 'true');
       const a = document.createElement('a');
-      a.href = l.url;
+      a.href = embedUrlFor(l);
       blockquote.appendChild(a);
       wrapper.appendChild(blockquote);
       frag.appendChild(wrapper);
